@@ -28,3 +28,9 @@ jobs:
 
       - name: Run scraper
         run: python cal_store_scraper.py
+      - name: Upload screenshots if any
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-screenshots
+          path: screenshots
