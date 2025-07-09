@@ -3,7 +3,7 @@ name: Cal Store Scraper
 on:
   # schedule:
   #   - cron: "0 4 * * *" # 7 AM Israel time (UTC+3)
-  workflow_dispatch: # you can also add: schedule: [{ cron: '0 7 * * *' }] for daily runs
+  workflow_dispatch:
 
 jobs:
   run-scraper:
@@ -28,6 +28,8 @@ jobs:
 
       - name: Run scraper
         run: python cal_store_scraper.py
+
+      # Upload screenshots if any
       - name: Upload screenshots if any
         if: always()
         uses: actions/upload-artifact@v4
