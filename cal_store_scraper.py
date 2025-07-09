@@ -11,6 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 from datetime import datetime
 
+
 def get_short_names():
     service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -25,12 +26,12 @@ def get_short_names():
 
 def init_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new")  # ✅ new mode, works better
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--window-size=1920,1080")
-    driver = webdriver.Chrome(options=chrome_options)
-    return driver
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    return webdriver.Chrome(options=chrome_options)
 
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
@@ -61,6 +62,7 @@ def search_show(driver, show_name):
     except Exception as e:
         print(f"No results found for '{show_name}' — {e}")
         # Take screenshot
+        time.sleep(5) 
         os.makedirs("screenshots", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"screenshots/{show_name}_{timestamp}.png"
