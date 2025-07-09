@@ -9,10 +9,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
+from datetime import datetime
 
 def get_short_names():
     service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
-    print(service_account_info["private_key"][:300])  # Should begin with "-----BEGIN PRIVATE KEY-----"
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
     client = gspread.authorize(creds)
@@ -37,14 +37,19 @@ def search_show(driver, show_name):
     wait = WebDriverWait(driver, 10)
 
     try:
-        # 1. Type into search input
+        # Wait for search form
+        wait = WebDriverWait(driver, 10)
         search_input = wait.until(EC.presence_of_element_located((By.NAME, "search_key")))
+
+        # Clear and enter search term
         search_input.clear()
         search_input.send_keys(show_name)
+        time.sleep(0.5)  # let autocomplete or JS react
         search_input.send_keys(Keys.RETURN)
 
         # 2. Wait for search results to appear
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
+        print(f"✅ Found results for '{show_name}'")
 
         # 3. Get the first search result
         first_result = driver.find_element(By.CSS_SELECTOR, "a.link-block")
@@ -55,6 +60,12 @@ def search_show(driver, show_name):
 
     except Exception as e:
         print(f"No results found for '{show_name}' — {e}")
+        # Take screenshot
+        os.makedirs("screenshots", exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"screenshots/{show_name}_{timestamp}.png"
+        driver.save_screenshot(filename)
+        print(f"🖼 Screenshot saved: {filename}")
         return None
 
 
