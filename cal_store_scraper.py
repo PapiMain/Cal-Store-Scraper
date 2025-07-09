@@ -5,9 +5,11 @@ import json
 
 def get_short_names():
     service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
+    print(service_account_info["private_key"][:300])  # Should begin with "-----BEGIN PRIVATE KEY-----"
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
     client = gspread.authorize(creds)
+    
 
     sheet = client.open("דאטה אפשיט אופיס").worksheet("הפקות")
     data = sheet.get_all_records()
