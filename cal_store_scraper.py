@@ -46,13 +46,19 @@ def search_show(driver, show_name):
 
     try:
         # Wait explicitly for the visible input
-        search_input = WebDriverWait(driver, 15).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "input[placeholder*='חיפוש חוויה']"))
-        )
+        search_input = None
+        for inp in driver.find_elements(By.NAME, "search_key"):
+            if inp.is_displayed():
+                search_input = inp
+                break
+
+        if not search_input:
+            raise Exception("No visible search input found")
+        
         print(f"✅ Using input: id={search_input.get_attribute('id')} | placeholder={search_input.get_attribute('placeholder')}")
 
         search_input.clear()
-        search_input.send_keys(show_name)
+        search_input.send_keys(show_name + Keys.RETURN)
         print(f"✏️ Entered show name: {show_name}")
 
         time.sleep(1)
