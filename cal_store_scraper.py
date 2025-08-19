@@ -39,40 +39,49 @@ def search_show(driver, show_name):
     wait = WebDriverWait(driver, 15)
     print("🟢 Step 1: Page loaded")
 
-    for inp in driver.find_elements(By.NAME, "search_key"):
-        print(inp.is_displayed(), inp.get_attribute("outerHTML"))
-        
+    # List all inputs with name=search_key and their visibility
+    inputs = driver.find_elements(By.NAME, "search_key")
+    for i, inp in enumerate(inputs):
+        print(f"Input #{i}: displayed={inp.is_displayed()} | id={inp.get_attribute('id')} | placeholder={inp.get_attribute('placeholder')}")
+
     try:
         # Wait explicitly for the visible input
         search_input = WebDriverWait(driver, 15).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "input[placeholder*='חיפוש חוויה']"))
         )
+        print(f"✅ Using input: id={search_input.get_attribute('id')} | placeholder={search_input.get_attribute('placeholder')}")
 
         search_input.clear()
         search_input.send_keys(show_name)
+        print(f"✏️ Entered show name: {show_name}")
+
         time.sleep(1)
 
-        # submit by clicking the button
-        driver.find_element(By.CSS_SELECTOR, "#search-form button").click()
+        # Find the button and print debug info
+        search_button = driver.find_element(By.CSS_SELECTOR, "#search-form button")
+        print(f"🔘 Clicking button: {search_button.get_attribute('outerHTML')}")
+        search_button.click()
 
-        
-        # Optional: wait a bit for results to render
+        # Wait a bit for URL to change
+        time.sleep(2)
+        print(f"🌐 Current URL after click: {driver.current_url}")
+
+        # Wait for results to appear
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
-        print("🌍 Current URL:", driver.current_url)
-        print(f"✅ Found results for '{show_name}'")
-
         first_result = driver.find_element(By.CSS_SELECTOR, "a.link-block")
         product_url = first_result.get_attribute("href")
+        print(f"✅ Found first result: {product_url}")
         return product_url
 
     except Exception as e:
-        print(f"No results found for '{show_name}' — {e}")
+        print(f"❌ No results found for '{show_name}' — {e}")
         os.makedirs("screenshots", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"screenshots/{show_name}_{timestamp}.png"
         driver.save_screenshot(filename)
         print(f"🖼 Screenshot saved: {filename}")
         return None
+
 
 
 def scrape_show_details(driver, product_url):
