@@ -51,12 +51,60 @@ def init_driver():
     return driver
 
 
+# def search_show(driver, show_name):
+#     driver.get("https://www.cal-store.co.il")
+#     wait = WebDriverWait(driver, 15)
+
+#     try:
+#         # Handle cookie banner if it appears
+#         try:
+#             cookie_btn = wait.until(
+#                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button#onetrust-accept-btn-handler"))
+#             )
+#             cookie_btn.click()
+#             print("✅ Cookie banner dismissed")
+#         except:
+#             pass  # no cookie popup, continue
+
+#         # Wait for search input to be clickable
+#         search_input = wait.until(
+#             EC.element_to_be_clickable((By.NAME, "search_key"))
+#         )
+
+#         # Clear and enter search term
+#         search_input.clear()
+#         search_input.send_keys(show_name)
+#         time.sleep(0.8)  # let autocomplete or JS react
+#         search_input.send_keys(Keys.RETURN)
+
+#         # 2. Wait for search results to appear
+#         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
+#         print(f"✅ Found results for '{show_name}'")
+
+#         # 3. Get the first search result
+#         first_result = driver.find_element(By.CSS_SELECTOR, "a.link-block")
+#         product_url = "https://www.cal-store.co.il" + first_result.get_attribute("href")
+
+#         print(f"Found product URL for '{show_name}': {product_url}")
+#         return product_url
+
+#     except Exception as e:
+#         print(f"No results found for '{show_name}' — {e}")
+#         # Take screenshot
+#         time.sleep(5) 
+#         os.makedirs("screenshots", exist_ok=True)
+#         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+#         filename = f"screenshots/{show_name}_{timestamp}.png"
+#         driver.save_screenshot(filename)
+#         print(f"🖼 Screenshot saved: {filename}")
+#         return None
+    
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
     wait = WebDriverWait(driver, 15)
 
     try:
-        # Handle cookie banner if it appears
+        # Handle cookie popup
         try:
             cookie_btn = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button#onetrust-accept-btn-handler"))
@@ -64,34 +112,28 @@ def search_show(driver, show_name):
             cookie_btn.click()
             print("✅ Cookie banner dismissed")
         except:
-            pass  # no cookie popup, continue
+            pass
 
-        # Wait for search input to be clickable
-        search_input = wait.until(
-            EC.element_to_be_clickable((By.NAME, "search_key"))
-        )
-
-        # Clear and enter search term
+        # Wait for search input
+        search_input = wait.until(EC.element_to_be_clickable((By.NAME, "search_key")))
         search_input.clear()
         search_input.send_keys(show_name)
-        time.sleep(0.8)  # let autocomplete or JS react
-        search_input.send_keys(Keys.RETURN)
+        time.sleep(0.5)
 
-        # 2. Wait for search results to appear
+        # Find the form and submit it
+        form = driver.find_element(By.ID, "search-form")
+        form.submit()
+
+        # Wait for results
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
         print(f"✅ Found results for '{show_name}'")
 
-        # 3. Get the first search result
         first_result = driver.find_element(By.CSS_SELECTOR, "a.link-block")
-        product_url = "https://www.cal-store.co.il" + first_result.get_attribute("href")
-
-        print(f"Found product URL for '{show_name}': {product_url}")
+        product_url = first_result.get_attribute("href")
         return product_url
 
     except Exception as e:
         print(f"No results found for '{show_name}' — {e}")
-        # Take screenshot
-        time.sleep(5) 
         os.makedirs("screenshots", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"screenshots/{show_name}_{timestamp}.png"
