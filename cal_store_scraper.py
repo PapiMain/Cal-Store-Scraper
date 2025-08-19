@@ -10,6 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 from datetime import datetime
+import undetected_chromedriver as uc
 
 
 def get_short_names():
@@ -25,32 +26,12 @@ def get_short_names():
     return [row["שם מקוצר"] for row in data if row["שם מקוצר"]]
 
 def init_driver():
-    chrome_options = Options()
-
-    # Run non-headless with virtual display on GitHub
-    # chrome_options.add_argument("--headless=new")  # use only if xvfb not available
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-
-    # Pretend it’s a real user
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_argument("--disable-infobars")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/114.0.0.0 Safari/537.36"
-    )
-
-    driver = webdriver.Chrome(options=chrome_options)
-
-    # Extra stealth patch
-    driver.execute_cdp_cmd(
-        "Page.addScriptToEvaluateOnNewDocument",
-        {"source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"}
-    )
-
+    options = uc.ChromeOptions()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
+    # remove --headless
+    driver = uc.Chrome(options=options)
     return driver
     
 def search_show(driver, show_name):
@@ -58,14 +39,14 @@ def search_show(driver, show_name):
     wait = WebDriverWait(driver, 15)
     print("🟢 Step 1: Page loaded")
 
+    for inp in driver.find_elements(By.NAME, "search_key"):
+        print(inp.is_displayed(), inp.get_attribute("outerHTML"))
+        
     try:
         # Wait explicitly for the visible input
         search_input = WebDriverWait(driver, 15).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "input[placeholder*='חיפוש חוויה']"))
         )
-
-        for inp in driver.find_elements(By.NAME, "search_key"):
-            print(inp.is_displayed(), inp.get_attribute("outerHTML"))
 
         search_input.clear()
         search_input.send_keys(show_name)
