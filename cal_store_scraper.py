@@ -26,8 +26,9 @@ def get_short_names():
 
 def init_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # or --headless=new if old works worse
-    chrome_options.add_argument("--disable-gpu")
+
+    # Run non-headless with virtual display on GitHub
+    # chrome_options.add_argument("--headless=new")  # use only if xvfb not available
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -36,120 +37,43 @@ def init_driver():
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-infobars")
     chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                "Chrome/114.0.0.0 Safari/537.36")
+    chrome_options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/114.0.0.0 Safari/537.36"
+    )
 
     driver = webdriver.Chrome(options=chrome_options)
 
     # Extra stealth patch
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-        "source": """
-            Object.defineProperty(navigator, 'webdriver', {get: () => undefined})
-        """
-    })
+    driver.execute_cdp_cmd(
+        "Page.addScriptToEvaluateOnNewDocument",
+        {"source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"}
+    )
+
     return driver
-
-
-# def search_show(driver, show_name):
-#     driver.get("https://www.cal-store.co.il")
-#     wait = WebDriverWait(driver, 15)
-
-#     try:
-#         # Handle cookie banner if it appears
-#         try:
-#             cookie_btn = wait.until(
-#                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button#onetrust-accept-btn-handler"))
-#             )
-#             cookie_btn.click()
-#             print("✅ Cookie banner dismissed")
-#         except:
-#             pass  # no cookie popup, continue
-
-#         # Wait for search input to be clickable
-#         search_input = wait.until(
-#             EC.element_to_be_clickable((By.NAME, "search_key"))
-#         )
-
-#         # Clear and enter search term
-#         search_input.clear()
-#         search_input.send_keys(show_name)
-#         time.sleep(0.8)  # let autocomplete or JS react
-#         search_input.send_keys(Keys.RETURN)
-
-#         # 2. Wait for search results to appear
-#         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
-#         print(f"✅ Found results for '{show_name}'")
-
-#         # 3. Get the first search result
-#         first_result = driver.find_element(By.CSS_SELECTOR, "a.link-block")
-#         product_url = "https://www.cal-store.co.il" + first_result.get_attribute("href")
-
-#         print(f"Found product URL for '{show_name}': {product_url}")
-#         return product_url
-
-#     except Exception as e:
-#         print(f"No results found for '{show_name}' — {e}")
-#         # Take screenshot
-#         time.sleep(5) 
-#         os.makedirs("screenshots", exist_ok=True)
-#         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#         filename = f"screenshots/{show_name}_{timestamp}.png"
-#         driver.save_screenshot(filename)
-#         print(f"🖼 Screenshot saved: {filename}")
-#         return None
     
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
     wait = WebDriverWait(driver, 15)
     print("🟢 Step 1: Page loaded")
 
-    with open("debug_page.html", "w", encoding="utf-8") as f:
-        f.write(driver.page_source)
-    print("=== PAGE SOURCE START ===")
-    print(driver.page_source)
-    print("=== PAGE SOURCE END ===")
-
-
-
     try:
-        # Handle cookie popup
-        try:
-            print("🟢 Step 2: Looking for cookie banner…")
-            cookie_btn = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "button#onetrust-accept-btn-handler"))
-            )
-            cookie_btn.click()
-            print("✅ Cookie banner dismissed")
-        except:
-            pass
+        # Wait explicitly for the visible input
+        search_input = WebDriverWait(driver, 15).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "input[placeholder*='חיפוש חוויה']"))
+        )
 
-        inputs = driver.find_elements(By.TAG_NAME, "input")
-        print("🔎 Found inputs:", [i.get_attribute("outerHTML") for i in inputs])
-    
-        # Wait for search input
-        search_input = wait.until(EC.element_to_be_clickable((By.NAME, "search_key")))
+        for inp in driver.find_elements(By.NAME, "search_key"):
+            print(inp.is_displayed(), inp.get_attribute("outerHTML"))
+
         search_input.clear()
         search_input.send_keys(show_name)
-        print("🟢 Step 3: Filling search box…")
-
-        # Option 1: Simulate pressing Enter
         search_input.send_keys(Keys.RETURN)
 
-        # OR Option 2: Submit the form directly
-        # form = driver.find_element(By.ID, "search-form")
-        # form.submit()
-
-        print("🌍 Current URL:", driver.current_url)
-        print(f"🔍 Submitted search for '{show_name}'")
-
-
-        # Debug: take screenshot immediately after clicking
-        os.makedirs("screenshots", exist_ok=True)
-        driver.save_screenshot(f"screenshots/{show_name}_after_click.png")
-
-        # Wait for results
+        # Optional: wait a bit for results to render
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
+        print("🌍 Current URL:", driver.current_url)
         print(f"✅ Found results for '{show_name}'")
 
         first_result = driver.find_element(By.CSS_SELECTOR, "a.link-block")

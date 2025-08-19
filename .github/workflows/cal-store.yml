@@ -23,11 +23,12 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Run scraper
-        run: python cal_store_scraper.py
+      - name: Run scraper with virtual display
+        run: xvfb-run -a python cal_store_scraper.py
 
       # Upload screenshots if any
       - name: Prepare screenshots folder
