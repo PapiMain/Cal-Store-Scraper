@@ -120,9 +120,14 @@ def search_show(driver, show_name):
         search_input.send_keys(show_name)
         time.sleep(0.5)
 
-        # Find the form and submit it
-        form = driver.find_element(By.ID, "search-form")
-        form.submit()
+        # Find the search button (the one inside the form) and click via JS
+        search_btn = driver.find_element(By.CSS_SELECTOR, "#search-form button")
+        driver.execute_script("arguments[0].click();", search_btn)
+        print(f"🔍 Clicked search for '{show_name}'")
+
+        # Debug: take screenshot immediately after clicking
+        os.makedirs("screenshots", exist_ok=True)
+        driver.save_screenshot(f"screenshots/{show_name}_after_click.png")
 
         # Wait for results
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
