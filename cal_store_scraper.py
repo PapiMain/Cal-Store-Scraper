@@ -50,8 +50,12 @@ def search_show(driver, show_name):
 
         search_input.clear()
         search_input.send_keys(show_name)
-        search_input.send_keys(Keys.RETURN)
+        time.sleep(1)
 
+        # submit by clicking the button
+        driver.find_element(By.CSS_SELECTOR, "#search-form button").click()
+
+        
         # Optional: wait a bit for results to render
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
         print("🌍 Current URL:", driver.current_url)
