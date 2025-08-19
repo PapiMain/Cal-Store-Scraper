@@ -53,17 +53,28 @@ def init_driver():
 
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 15)
 
     try:
-        # Wait for search form
-        wait = WebDriverWait(driver, 10)
-        search_input = wait.until(EC.presence_of_element_located((By.NAME, "search_key")))
+        # Handle cookie banner if it appears
+        try:
+            cookie_btn = wait.until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "button#onetrust-accept-btn-handler"))
+            )
+            cookie_btn.click()
+            print("✅ Cookie banner dismissed")
+        except:
+            pass  # no cookie popup, continue
+
+        # Wait for search input to be clickable
+        search_input = wait.until(
+            EC.element_to_be_clickable((By.NAME, "search_key"))
+        )
 
         # Clear and enter search term
         search_input.clear()
         search_input.send_keys(show_name)
-        time.sleep(0.5)  # let autocomplete or JS react
+        time.sleep(0.8)  # let autocomplete or JS react
         search_input.send_keys(Keys.RETURN)
 
         # 2. Wait for search results to appear
