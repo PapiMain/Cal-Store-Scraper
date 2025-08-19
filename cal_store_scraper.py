@@ -102,10 +102,17 @@ def init_driver():
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
     wait = WebDriverWait(driver, 15)
+    print("🟢 Step 1: Page loaded")
+
+    with open("debug_page.html", "w", encoding="utf-8") as f:
+        f.write(driver.page_source)
+    print("📄 Saved current page HTML to debug_page.html")
+
 
     try:
         # Handle cookie popup
         try:
+            print("🟢 Step 2: Looking for cookie banner…")
             cookie_btn = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button#onetrust-accept-btn-handler"))
             )
@@ -118,14 +125,16 @@ def search_show(driver, show_name):
         search_input = wait.until(EC.element_to_be_clickable((By.NAME, "search_key")))
         search_input.clear()
         search_input.send_keys(show_name)
+        print("🟢 Step 3: Filling search box…")
 
         # Option 1: Simulate pressing Enter
-        search_input.send_keys(Keys.RETURN)
+        # search_input.send_keys(Keys.RETURN)
 
         # OR Option 2: Submit the form directly
-        # form = driver.find_element(By.ID, "search-form")
-        # form.submit()
+        form = driver.find_element(By.ID, "search-form")
+        form.submit()
 
+        print("🌍 Current URL:", driver.current_url)
         print(f"🔍 Submitted search for '{show_name}'")
 
 
