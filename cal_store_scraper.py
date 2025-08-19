@@ -118,12 +118,16 @@ def search_show(driver, show_name):
         search_input = wait.until(EC.element_to_be_clickable((By.NAME, "search_key")))
         search_input.clear()
         search_input.send_keys(show_name)
-        time.sleep(0.5)
 
-        # Find the search button (the one inside the form) and click via JS
-        search_btn = driver.find_element(By.CSS_SELECTOR, "#search-form button")
-        driver.execute_script("arguments[0].click();", search_btn)
-        print(f"🔍 Clicked search for '{show_name}'")
+        # Option 1: Simulate pressing Enter
+        search_input.send_keys(Keys.RETURN)
+
+        # OR Option 2: Submit the form directly
+        # form = driver.find_element(By.ID, "search-form")
+        # form.submit()
+
+        print(f"🔍 Submitted search for '{show_name}'")
+
 
         # Debug: take screenshot immediately after clicking
         os.makedirs("screenshots", exist_ok=True)
