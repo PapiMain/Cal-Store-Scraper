@@ -106,7 +106,10 @@ def search_show(driver, show_name):
 
     with open("debug_page.html", "w", encoding="utf-8") as f:
         f.write(driver.page_source)
-    print("📄 Saved current page HTML to debug_page.html")
+    print("=== PAGE SOURCE START ===")
+    print(driver.page_source)
+    print("=== PAGE SOURCE END ===")
+
 
 
     try:
@@ -121,6 +124,9 @@ def search_show(driver, show_name):
         except:
             pass
 
+        inputs = driver.find_elements(By.TAG_NAME, "input")
+        print("🔎 Found inputs:", [i.get_attribute("outerHTML") for i in inputs])
+    
         # Wait for search input
         search_input = wait.until(EC.element_to_be_clickable((By.NAME, "search_key")))
         search_input.clear()
@@ -128,11 +134,11 @@ def search_show(driver, show_name):
         print("🟢 Step 3: Filling search box…")
 
         # Option 1: Simulate pressing Enter
-        # search_input.send_keys(Keys.RETURN)
+        search_input.send_keys(Keys.RETURN)
 
         # OR Option 2: Submit the form directly
-        form = driver.find_element(By.ID, "search-form")
-        form.submit()
+        # form = driver.find_element(By.ID, "search-form")
+        # form.submit()
 
         print("🌍 Current URL:", driver.current_url)
         print(f"🔍 Submitted search for '{show_name}'")
