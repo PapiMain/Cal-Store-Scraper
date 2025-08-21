@@ -37,6 +37,8 @@ def init_driver():
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
     wait = WebDriverWait(driver, 15)
+    search_input = wait.until(
+    EC.visibility_of_element_located((By.NAME, "search_key")))
     print("🟢 Step 1: Page loaded")
 
     # List all inputs with name=search_key and their visibility
@@ -69,7 +71,7 @@ def search_show(driver, show_name):
         search_button.click()
 
         # Wait a bit for URL to change
-        time.sleep(1)
+        # time.sleep(1)
         print(f"🌐 Current URL after click: {driver.current_url}")
 
         # Get all product links
@@ -114,40 +116,36 @@ def scrape_show_details(driver, product_url):
     wait = WebDriverWait(driver, 10)
 
     try:
-        # Get the show title
-        title = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.product-title"))).text.strip()
+        # ✅ Fix selector: class is "productTitle", not "product-title"
+        title = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.productTitle"))).text.strip()
 
-        # Wait for show rows to load
+        # Wait for rows
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")))
 
-        # Find all visible rows
         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")
         results = []
 
         for row in rows:
             if not row.is_displayed():
-                continue  # skip hidden rows
+                continue
 
             cols = row.find_elements(By.CSS_SELECTOR, "td")
             if len(cols) < 5:
                 continue
 
-            # Clean date + hall text (e.g. "16/08/2025 11:00 היכל התרבות כפר סבא")
+            # ✅ Parse date, time, hall correctly
             datetime_hall_text = cols[0].text.strip()
-            parts = datetime_hall_text.split(" ", 2)  # ['16/08/2025', '11:00', 'היכל התרבות כפר סבא']
-
+            parts = datetime_hall_text.split(" ", 2)  # split into [date, time, hall...]
             if len(parts) < 3:
                 continue
 
-            date = parts[0]
-            time = parts[1]
-            hall = parts[2]
+            date, time, hall = parts[0], parts[1], parts[2]
 
-            # Prices
-            special_price = cols[2].text.strip()
-            full_price = cols[3].text.strip()
+            # ✅ Prices
+            special_price = cols[2].text.replace("₪", "").replace("\u200f", "").strip()
+            full_price = cols[3].text.replace("₪", "").replace("\u200f", "").strip()
 
-            # Seats available (e.g. "13 מקומות")
+            # ✅ Available seats
             available_text = cols[4].text.strip().split()
             available = available_text[0] if available_text else ""
 
@@ -156,6 +154,8 @@ def scrape_show_details(driver, product_url):
                 "date": date,
                 "time": time,
                 "hall": hall,
+                "special_price": special_price,
+                "full_price": full_price,
                 "available": available
             })
 
