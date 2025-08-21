@@ -124,16 +124,20 @@ def scrape_show_details(driver, product_url):
     try:
         # ✅ Fix selector: class is "productTitle", not "product-title"
         title = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.productTitle"))).text.strip()
+        print(f"🟢 Step 2: Product page loaded for '{title}'")
 
         # Wait for rows
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")))
+        print("🟢 Step 3: Stock table loaded")
 
         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")
         results = []
 
         for row in rows:
-            if not row.is_displayed():
-                continue
+             # ✅ Use attributes instead of visible text
+            stock_uid = row.get_attribute("data-stock-uid")
+            hall_uid = row.get_attribute("data-hall-uid")
+            date_show = row.get_attribute("data-date-show")
 
             cols = row.find_elements(By.CSS_SELECTOR, "td")
             if len(cols) < 5:
@@ -143,7 +147,9 @@ def scrape_show_details(driver, product_url):
             datetime_hall_text = cols[0].text.strip()
             parts = datetime_hall_text.split(" ", 2)  # split into [date, time, hall...]
             if len(parts) < 3:
-                continue
+                hall = ""
+            else:
+                hall = parts[2]
 
             date, time, hall = parts[0], parts[1], parts[2]
 
@@ -157,7 +163,7 @@ def scrape_show_details(driver, product_url):
 
             results.append({
                 "title": title,
-                "date": date,
+                "date": date_show,
                 "time": time,
                 "hall": hall,
                 "special_price": special_price,
