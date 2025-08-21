@@ -37,7 +37,7 @@ def init_driver():
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
     wait = WebDriverWait(driver, 15)
-    wait.until(EC.visibility_of_element_located((By.NAME, "search_key")))
+    # wait.until(EC.visibility_of_element_located((By.NAME, "search_key")))
     print("🟢 Step 1: Page loaded")
 
     # List all inputs with name=search_key and their visibility
@@ -62,15 +62,12 @@ def search_show(driver, show_name):
         search_input.send_keys(show_name + Keys.RETURN)
         print(f"✏️ Entered show name: {show_name}")
 
-        # time.sleep(1)
-
         # Find the button and print debug info
         search_button = driver.find_element(By.CSS_SELECTOR, "#search-form button")
         print(f"🔘 Clicking button: {search_button.get_attribute('outerHTML')}")
         search_button.click()
 
         # Wait a bit for URL to change
-        # time.sleep(1)
         print(f"🌐 Current URL after click: {driver.current_url}")
 
         # Get all product links
