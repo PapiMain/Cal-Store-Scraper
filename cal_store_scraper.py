@@ -40,9 +40,9 @@ def search_show(driver, show_name):
     print("🟢 Step 1: Page loaded")
 
     # List all inputs with name=search_key and their visibility
-    inputs = driver.find_elements(By.NAME, "search_key")
-    for i, inp in enumerate(inputs):
-        print(f"Input #{i}: displayed={inp.is_displayed()} | id={inp.get_attribute('id')} | placeholder={inp.get_attribute('placeholder')}")
+    # inputs = driver.find_elements(By.NAME, "search_key")
+    # for i, inp in enumerate(inputs):
+    #     print(f"Input #{i}: displayed={inp.is_displayed()} | id={inp.get_attribute('id')} | placeholder={inp.get_attribute('placeholder')}")
 
     try:
         # Wait explicitly for the visible input
@@ -61,7 +61,7 @@ def search_show(driver, show_name):
         search_input.send_keys(show_name + Keys.RETURN)
         print(f"✏️ Entered show name: {show_name}")
 
-        time.sleep(1)
+        # time.sleep(1)
 
         # Find the button and print debug info
         search_button = driver.find_element(By.CSS_SELECTOR, "#search-form button")
@@ -69,15 +69,31 @@ def search_show(driver, show_name):
         search_button.click()
 
         # Wait a bit for URL to change
-        time.sleep(2)
+        time.sleep(1)
         print(f"🌐 Current URL after click: {driver.current_url}")
 
-        # Wait for results to appear
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a.link-block")))
-        first_result = driver.find_element(By.CSS_SELECTOR, "a.link-block")
-        product_url = first_result.get_attribute("href")
-        print(f"✅ Found first result: {product_url}")
-        return product_url
+        # Get all product links
+        wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.link-block")))
+        all_links = driver.find_elements(By.CSS_SELECTOR, "a.link-block")
+
+        print(f"🔗 Found {len(all_links)} candidate links")
+
+        product_urls = []
+        for link in all_links:
+            url = link.get_attribute("href")
+            aria = link.get_attribute("aria-label") or ""
+            parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text
+
+            # Filter by show_name (case-insensitive, space-tolerant)
+            if show_name in aria or show_name in parent_text:
+                product_urls.append(url)
+
+        if product_urls:
+            print(f"✅ Filtered {len(product_urls)} relevant links: {product_urls}")
+            return product_urls
+        else:
+            print(f"⚠️ No relevant links found containing '{show_name}'")
+            return []
 
     except Exception as e:
         print(f"❌ No results found for '{show_name}' — {e}")
@@ -86,7 +102,7 @@ def search_show(driver, show_name):
         filename = f"screenshots/{show_name}_{timestamp}.png"
         driver.save_screenshot(filename)
         print(f"🖼 Screenshot saved: {filename}")
-        return None
+        return []
 
 
 
@@ -152,11 +168,17 @@ def scrape_show_details(driver, product_url):
 def main():
     driver = init_driver()
     short_names = get_short_names()
+    all_results = []
+
     for show_name in short_names:
-        url = search_show(driver, show_name)
-        scrape_show_details(driver, url)
-        time.sleep(2)  # polite pause between queries
+        urls = search_show(driver, show_name)  # now returns list
+        for url in urls:
+            results = scrape_show_details(driver, url)
+            all_results.extend(results)
+            time.sleep(2)
+
     driver.quit()
+    return all_results
 
 if __name__ == "__main__":
     main()
