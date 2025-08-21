@@ -78,23 +78,23 @@ def search_show(driver, show_name):
         
         product_urls = []
 
-        show_name_clean = show_name.replace(" ", "").lower()
-        for link in all_links:
-            url = link.get_attribute("href")
-            aria = (link.get_attribute("aria-label") or "").replace(" ", "").lower()
-            parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text.replace(" ", "").lower()
-
-            if show_name_clean in aria or show_name_clean in parent_text:
-                product_urls.append(url)
-
+        # show_name_clean = show_name.replace(" ", "").lower()
         # for link in all_links:
         #     url = link.get_attribute("href")
-        #     aria = link.get_attribute("aria-label") or ""
-        #     parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text
+        #     aria = (link.get_attribute("aria-label") or "").replace(" ", "").lower()
+        #     parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text.replace(" ", "").lower()
 
-        #     # Filter by show_name (case-insensitive, space-tolerant)
-        #     if show_name in aria or show_name in parent_text:
+        #     if show_name_clean in aria or show_name_clean in parent_text:
         #         product_urls.append(url)
+
+        for link in all_links:
+            url = link.get_attribute("href")
+            aria = link.get_attribute("aria-label") or ""
+            parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text
+
+            # Filter by show_name (case-insensitive, space-tolerant)
+            if show_name in aria or show_name in parent_text:
+                product_urls.append(url)
 
         if product_urls:
             print(f"✅ Filtered {len(product_urls)} relevant links: {product_urls}")
@@ -122,61 +122,82 @@ def scrape_show_details(driver, product_url):
     wait = WebDriverWait(driver, 30)
 
     try:
-        # ✅ Fix selector: class is "productTitle", not "product-title"
-        title = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.productTitle"))).text.strip()
+          # ✅ Wait for page to load
+        title_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.productTitle")))
+        title = title_element.text.strip()
         print(f"🟢 Step 2: Product page loaded for '{title}'")
 
-        # Wait for rows
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")))
-        print("🟢 Step 3: Stock table loaded")
+        # ✅ Wait for hidden input that indicates full JS load
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input.show_hidden_all_halls")))
+        print("🟢 Step 3: Hidden halls input loaded")
 
+         # 🔍 Debug: list all hidden inputs
+        hidden_inputs = driver.find_elements(By.CSS_SELECTOR, "input.show_hidden_all_halls, input.show_hidden_all_dates")
+        for i, inp in enumerate(hidden_inputs):
+            print(f"Hidden Input #{i}: value={inp.get_attribute('value')[:100]}...")  # show first 100 chars
+
+        # 🔍 Debug: list all table rows
         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")
+        print(f"🟢 Step 4: Found {len(rows)} table rows")
+        for i, row in enumerate(rows):
+            print(f"Row #{i}: displayed={row.is_displayed()} | stock_uid={row.get_attribute('data-stock-uid')} | hall_uid={row.get_attribute('data-hall-uid')} | date_show={row.get_attribute('data-date-show')}")
+
         results = []
 
         for row in rows:
-             # ✅ Use attributes instead of visible text
-            stock_uid = row.get_attribute("data-stock-uid")
-            hall_uid = row.get_attribute("data-hall-uid")
-            date_show = row.get_attribute("data-date-show")
+            try:
+                # ✅ Use attributes instead of visible text
+                stock_uid = row.get_attribute("data-stock-uid")
+                hall_uid = row.get_attribute("data-hall-uid")
+                date_show = row.get_attribute("data-date-show")
 
-            cols = row.find_elements(By.CSS_SELECTOR, "td")
-            if len(cols) < 5:
-                continue
+                cols = row.find_elements(By.CSS_SELECTOR, "td")
+                if len(cols) < 5:
+                    print(f"⚠️ Skipping row {stock_uid}: not enough columns")
+                    continue
 
-            # ✅ Parse date, time, hall correctly
-            datetime_hall_text = cols[0].text.strip()
-            parts = datetime_hall_text.split(" ", 2)  # split into [date, time, hall...]
-            if len(parts) < 3:
-                hall = ""
-            else:
-                hall = parts[2]
+                # Parse date, time, hall
+                datetime_hall_text = cols[0].text.strip()
+                parts = datetime_hall_text.split(" ", 2)
+                if len(parts) < 3:
+                    hall = ""
+                else:
+                    hall = parts[2]
 
-            date, time, hall = parts[0], parts[1], parts[2]
+                date, time = parts[0], parts[1]
 
-            # ✅ Prices
-            special_price = cols[2].text.replace("₪", "").replace("\u200f", "").strip()
-            full_price = cols[3].text.replace("₪", "").replace("\u200f", "").strip()
+                # ✅ Prices
+                special_price = cols[2].text.replace("₪", "").replace("\u200f", "").strip()
+                full_price = cols[3].text.replace("₪", "").replace("\u200f", "").strip()
 
-            # ✅ Available seats
-            available_text = cols[4].text.strip().split()
-            available = available_text[0] if available_text else ""
+                # ✅ Available seats
+                available_text = cols[4].text.strip().split()
+                available = available_text[0] if available_text else ""
 
-            results.append({
-                "title": title,
-                "date": date_show,
-                "time": time,
-                "hall": hall,
-                "special_price": special_price,
-                "full_price": full_price,
-                "available": available
-            })
+                results.append({
+                    "title": title,
+                    "date": date_show,
+                    "time": time,
+                    "hall": hall,
+                    "special_price": special_price,
+                    "full_price": full_price,
+                    "available": available
+                })
+            except Exception as e_row:
+                print(f"⚠️ Failed parsing row {row.get_attribute('data-stock-uid')}: {e_row}")
 
-        print(results)
+        print(f"🟢 Step 5: Scraped {len(results)} entries")
+        # 🔍 Debug: print first 3 results
+        for r in results[:3]:
+            print(r)
 
         return results
 
     except Exception as e:
         print("❌ Failed to scrape product details:", e)
+        # 🔍 Debug: dump page source for investigation
+        page_source = driver.page_source
+        print(f"🟢 Page source snapshot (first 500 chars): {page_source[:500]}")
         return []
 
 def main():
