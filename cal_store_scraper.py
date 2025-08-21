@@ -36,8 +36,8 @@ def init_driver():
     
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
-    wait = WebDriverWait(driver, 60)
-    wait.until(EC.visibility_of_element_located((By.NAME, "search_key")))
+    wait = WebDriverWait(driver, 15)
+    wait.until(EC.presence_of_element_located((By.NAME, "search_key")))
     print("🟢 Step 1: Page loaded")
 
     # List all inputs with name=search_key and their visibility
