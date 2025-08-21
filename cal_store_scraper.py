@@ -75,16 +75,26 @@ def search_show(driver, show_name):
         all_links = driver.find_elements(By.CSS_SELECTOR, "a.link-block")
 
         print(f"🔗 Found {len(all_links)} candidate links")
-
+        
         product_urls = []
+
+        show_name_clean = show_name.replace(" ", "").lower()
         for link in all_links:
             url = link.get_attribute("href")
-            aria = link.get_attribute("aria-label") or ""
-            parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text
+            aria = (link.get_attribute("aria-label") or "").replace(" ", "").lower()
+            parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text.replace(" ", "").lower()
 
-            # Filter by show_name (case-insensitive, space-tolerant)
-            if show_name in aria or show_name in parent_text:
+            if show_name_clean in aria or show_name_clean in parent_text:
                 product_urls.append(url)
+
+        # for link in all_links:
+        #     url = link.get_attribute("href")
+        #     aria = link.get_attribute("aria-label") or ""
+        #     parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text
+
+        #     # Filter by show_name (case-insensitive, space-tolerant)
+        #     if show_name in aria or show_name in parent_text:
+        #         product_urls.append(url)
 
         if product_urls:
             print(f"✅ Filtered {len(product_urls)} relevant links: {product_urls}")
