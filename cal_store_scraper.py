@@ -36,7 +36,7 @@ def init_driver():
     
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
-    wait = WebDriverWait(driver, 30)
+    wait = WebDriverWait(driver, 60)
     wait.until(EC.visibility_of_element_located((By.NAME, "search_key")))
     print("🟢 Step 1: Page loaded")
 
@@ -109,7 +109,7 @@ def scrape_show_details(driver, product_url):
         return []
 
     driver.get(product_url)
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 30)
 
     try:
         # ✅ Fix selector: class is "productTitle", not "product-title"
