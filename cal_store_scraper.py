@@ -37,8 +37,7 @@ def init_driver():
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
     wait = WebDriverWait(driver, 15)
-    search_input = wait.until(
-    EC.visibility_of_element_located((By.NAME, "search_key")))
+    wait.until(EC.visibility_of_element_located((By.NAME, "search_key")))
     print("🟢 Step 1: Page loaded")
 
     # List all inputs with name=search_key and their visibility
@@ -158,6 +157,8 @@ def scrape_show_details(driver, product_url):
                 "full_price": full_price,
                 "available": available
             })
+
+        print(results)
 
         return results
 
