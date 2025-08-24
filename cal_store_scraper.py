@@ -40,7 +40,7 @@ def search_show(driver, show_name):
     wait.until(EC.presence_of_element_located((By.NAME, "search_key")))
     print("🟢 Step 1: Page loaded")
 
-    # List all inputs with name=search_key and their visibility
+    # List all inputs with name=search_key and their visibility (for debugging)
     # inputs = driver.find_elements(By.NAME, "search_key")
     # for i, inp in enumerate(inputs):
     #     print(f"Input #{i}: displayed={inp.is_displayed()} | id={inp.get_attribute('id')} | placeholder={inp.get_attribute('placeholder')}")
@@ -77,15 +77,6 @@ def search_show(driver, show_name):
         print(f"🔗 Found {len(all_links)} candidate links")
         
         product_urls = []
-
-        # show_name_clean = show_name.replace(" ", "").lower()
-        # for link in all_links:
-        #     url = link.get_attribute("href")
-        #     aria = (link.get_attribute("aria-label") or "").replace(" ", "").lower()
-        #     parent_text = link.find_element(By.XPATH, "./ancestor::div[contains(@class,'categories__item')]").text.replace(" ", "").lower()
-
-        #     if show_name_clean in aria or show_name_clean in parent_text:
-        #         product_urls.append(url)
 
         for link in all_links:
             url = link.get_attribute("href")
@@ -134,13 +125,14 @@ def scrape_show_details(driver, product_url):
          # 🔍 Debug: list all hidden inputs
         hidden_inputs = driver.find_elements(By.CSS_SELECTOR, "input.show_hidden_all_halls, input.show_hidden_all_dates")
         for i, inp in enumerate(hidden_inputs):
-            print(f"Hidden Input #{i}: value={inp.get_attribute('value')[:100]}...")  # show first 100 chars
+            print(f"Hidden Input #{i}: value={inp.get_attribute('value')[:200]}...")  # show first 200 chars
 
         # 🔍 Debug: list all table rows
         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")
         print(f"🟢 Step 4: Found {len(rows)} table rows")
         for i, row in enumerate(rows):
             print(f"Row #{i}: displayed={row.is_displayed()} | stock_uid={row.get_attribute('data-stock-uid')} | hall_uid={row.get_attribute('data-hall-uid')} | date_show={row.get_attribute('data-date-show')}")
+            print(f"Row {i}: style={row.get_attribute('style')} | stock_uid={row.get_attribute('data-stock-uid')}")
 
         results = []
 
