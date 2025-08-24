@@ -1,7 +1,7 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
-import json
+import json, re, html
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -12,7 +12,7 @@ from selenium.common.exceptions import TimeoutException
 import time
 from datetime import datetime
 import undetected_chromedriver as uc
-import re
+
 
 
 def get_short_names():
@@ -115,52 +115,71 @@ def scrape_show_details(driver, product_url):
     wait = WebDriverWait(driver, 30)
 
     try:
-          # ✅ Wait for page to load
+        # 🟢 Step 2: Title
         try:
-            # First try the main header
-            title_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h2.font-weight-600")))
-            title = title_element.text.strip()
-        except:
-            # Fallback: breadcrumb strong text
-            title_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span.d-none.d-lg-inline strong")))
-            title = title_element.text.strip()
-
-        print(f"🟢 Step 2: Product page loaded for '{title}'")
-        print(f"title_element HTML: {title_element}")
-
-        # 🟢 Step 3: Grab hidden inputs (they contain JSON with all shows)
-        hidden_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type=hidden][id^=Halls]")
-        hall_data = []
-        for i, inp in enumerate(hidden_inputs):
-            val = inp.get_attribute("value")
-            print(f"Hidden Input #{i}: value length={len(val)}")
+            title_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h2.font-weight-600")))
+            title = (driver.execute_script("return arguments[0].textContent;", title_el) or "").strip()
+            if not title:
+                raise Exception("Empty h2 text, fallback")
+        except Exception:
             try:
-                hall_data.extend(json.loads(val))
-            except:
-                # Sometimes the value is not clean JSON, try fixing
-                fixed = re.sub(r'([{,])\s*([a-zA-Z0-9_]+):', r'\1"\2":', val)  # add quotes to keys
-                try:
-                    hall_data.extend(json.loads(fixed))
-                except Exception as e:
-                    print(f"⚠️ Failed parsing hidden input #{i}: {e}")
+                title_el = driver.find_element(By.CSS_SELECTOR, "span.d-none.d-lg-inline strong")
+                title = (driver.execute_script("return arguments[0].textContent;", title_el) or "").strip()
+            except Exception:
+                title = ""
+        print(f"🟢 Step 2: Product page loaded for '{title}'")
 
-        # 🔍 Debug: list all table rows
-        # rows = driver.find_elements(By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")
-        # print(f"🟢 Step 4: Found {len(rows)} table rows")
-        # for i, row in enumerate(rows):
-        #     print(f"Row #{i}: displayed={row.is_displayed()} | stock_uid={row.get_attribute('data-stock-uid')} | hall_uid={row.get_attribute('data-hall-uid')} | date_show={row.get_attribute('data-date-show')}")
-        #     print(f"Row {i}: style={row.get_attribute('style')} | stock_uid={row.get_attribute('data-stock-uid')}")
-         # 🟢 Step 4: Parse table rows (for prices + availability)
+        # 🟢 Step 3: Hidden inputs → JSON (all halls & dates)
+        halls_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input.show_hidden_all_halls")))
+        dates_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input.show_hidden_all_dates")))
 
+        halls_raw = halls_el.get_attribute("value") or "[]"
+        dates_raw = dates_el.get_attribute("value") or "[]"
+
+        # Values can be HTML-escaped (&quot; etc). Unescape, then JSON-parse.
+        halls_str = html.unescape(halls_raw)
+        dates_str = html.unescape(dates_raw)
+
+        try:
+            halls_list = json.loads(halls_str)
+        except Exception as e:
+            print(f"⚠️ halls JSON parse failed ({e}). First 200 chars: {halls_str[:200]}")
+            halls_list = []
+
+        try:
+            dates_list = json.loads(dates_str)
+        except Exception as e:
+            print(f"⚠️ dates JSON parse failed ({e}). First 200 chars: {dates_str[:200]}")
+            dates_list = []
+
+        print(f"🟢 Hidden JSON: halls={len(halls_list)} entries, dates={len(dates_list)} entries")
+
+        # Build lookups
+        hall_by_id = {}
+        for h in halls_list:
+            hid = h.get("d_hall_id")
+            if hid:
+                hall_by_id[hid] = h
+
+        stock_to_hall = {}
+        stock_to_date = {}
+        for d in dates_list:
+            sid = d.get("stock_uid")
+            if sid:
+                stock_to_hall[sid] = d.get("d_hall_id")
+                stock_to_date[sid] = d.get("d_end_use_date")
+
+        # 🟢 Step 4: Parse table rows (hidden + visible)
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")))
         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")
         print(f"🟢 Step 4: Found {len(rows)} table rows")
+
         results = []
 
         for idx, row in enumerate(rows):
-            stock_uid = row.get_attribute("data-stock-uid")
-            hall_uid = row.get_attribute("data-hall-uid")
-            date_show = row.get_attribute("data-date-show")
+            stock_uid = row.get_attribute("data-stock-uid") or ""
+            hall_uid  = row.get_attribute("data-hall-uid") or ""
+            date_show = row.get_attribute("data-date-show") or ""
 
             print(f"Row #{idx}: displayed={row.is_displayed()} | stock_uid={stock_uid} | hall_uid={hall_uid} | date_show={date_show}")
 
@@ -169,26 +188,47 @@ def scrape_show_details(driver, product_url):
                 print(f"⚠️ Skipping row {idx}, not enough columns")
                 continue
 
+            # Use textContent so we capture values from display:none rows
+            def tc(el):
+                return (driver.execute_script("return arguments[0].textContent;", el) or "").strip()
+
+            # col[0] looks like: "DD/MM/YYYY HH:MM HALL_NAME"
+            col0_text = tc(cols[0])
+
             # Prices
-            special_price = cols[2].text.replace("₪", "").replace("\u200f", "").strip()
-            full_price = cols[3].text.replace("₪", "").replace("\u200f", "").strip()
+            special_price = re.sub(r"[^\d]", "", tc(cols[2]))  # keep digits
+            full_price    = re.sub(r"[^\d]", "", tc(cols[3]))
 
-            # Available seats
-            available_text = cols[4].text.strip().split()
-            available = available_text[0] if available_text else ""
+            # Available seats (cell includes a button; grab first number)
+            avail_text = tc(cols[4])
+            m = re.search(r"\d+", avail_text)
+            available = m.group(0) if m else ""
 
-            # Find hall name from hidden data
+            # Hall name: prefer hidden JSON map; fallback to parsed col[0]
             hall_name = ""
-            for entry in hall_data:
-                if entry.get("stock_uid") == stock_uid or entry.get("d_hall_id") == hall_uid:
-                    hall_name = entry.get("hall_area_name") or entry.get("area") or ""
-                    break
+            lookup_hall_id = hall_uid or stock_to_hall.get(stock_uid)
+            if lookup_hall_id and lookup_hall_id in hall_by_id:
+                hall_name = hall_by_id[lookup_hall_id].get("hall_area_name") or hall_by_id[lookup_hall_id].get("area") or ""
+            if not hall_name and col0_text:
+                # Extract hall name from "date time hall"
+                parts = col0_text.split(" ", 2)
+                if len(parts) >= 3:
+                    hall_name = parts[2].strip()
 
-            # Extract date + time properly
-            if date_show and " " in date_show:
-                date_part, time_part = date_show.split(" ", 1)
-            else:
-                date_part, time_part = "", ""
+            # Date/time: prefer attribute; fallback to first TD
+            date_part, time_part = "", ""
+            src_dt = date_show or stock_to_date.get(stock_uid) or ""
+            if src_dt and " " in src_dt:
+                date_part, time_part = src_dt.split(" ", 1)
+                # trim seconds if present (HH:MM[:SS])
+                if len(time_part) >= 5:
+                    time_part = time_part[:5]
+            elif col0_text:
+                # from visible string
+                parts = col0_text.split(" ", 2)
+                if len(parts) >= 2:
+                    date_part = parts[0].strip()
+                    time_part = parts[1].strip()
 
             results.append({
                 "title": title,
@@ -201,7 +241,8 @@ def scrape_show_details(driver, product_url):
             })
 
         print(f"🟢 Step 5: Scraped {len(results)} entries")
-        print(results)
+        for r in results:
+            print(r)
         return results
 
     except Exception as e:
