@@ -5,13 +5,9 @@ from datetime import datetime
 import os
 import json, re, html
 import pytz
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
 import time
 from datetime import datetime
 import undetected_chromedriver as uc
@@ -305,10 +301,14 @@ def update_sheet_with_cal_store_event(scraped_event):
             elif isinstance(row_date, datetime):
                 row_date = row_date.date()
 
+            # Flexible title matching: either contains the other
+            title_match = (scraped_event["title"].strip() in row["הפקה"].strip()
+            or row["הפקה"].strip() in scraped_event["title"].strip())
+
             # Match by title, hall, date, and organization "ויזה כאל"
             if (
-                scraped_event["title"].strip() in row["הפקה"].strip() and
-                # row["אולם"].strip() == scraped_event["hall"].strip() and
+                title_match and
+                # row["אולם"].strip() == scraped_event["hall"].strip() and # Hall matching disabled for flexibility
                 row_date == scraped_date and
                 row["ארגון"].strip() == "ויזה כאל"
             ):
