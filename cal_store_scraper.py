@@ -61,8 +61,11 @@ def search_show(driver, show_name):
         print(f"✅ Using input: id={search_input.get_attribute('id')} | placeholder={search_input.get_attribute('placeholder')}")
 
         search_input.clear()
-        search_input.send_keys(show_name + Keys.RETURN)
+        search_input.send_keys(show_name)
         print(f"✏️ Entered show name: {show_name}")
+        
+        # Wait until the hidden input actually has the value
+        wait.until(lambda d: d.find_element(By.NAME, "search_key").get_attribute("value").strip() != "-")
 
          # Wait for the search results to load
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#search-form button")))
@@ -111,8 +114,6 @@ def search_show(driver, show_name):
         driver.save_screenshot(filename)
         print(f"🖼 Screenshot saved: {filename}")
         return []
-
-
 
 def scrape_show_details(driver, product_url):
     if not product_url:
