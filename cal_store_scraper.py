@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 import time
 from datetime import datetime
 import undetected_chromedriver as uc
@@ -110,12 +111,19 @@ def scrape_show_details(driver, product_url):
         return []
 
     driver.get(product_url)
-    wait = WebDriverWait(driver, 30)
+    wait = WebDriverWait(driver, 60)
 
     try:
           # ✅ Wait for page to load
-        title_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1.productTitle")))
-        title = title_element.text.strip()
+        try:
+            # First try the main header
+            title_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h2.font-weight-600")))
+            title = title_element.text.strip()
+        except TimeoutException:
+            # Fallback: breadcrumb strong text
+            title_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span.d-none.d-lg-inline strong")))
+            title = title_element.text.strip()
+
         print(f"🟢 Step 2: Product page loaded for '{title}'")
 
         # ✅ Wait for hidden input that indicates full JS load
