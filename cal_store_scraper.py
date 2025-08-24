@@ -1,7 +1,10 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
+from datetime import datetime
 import os
 import json, re, html
+import pytz
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -12,6 +15,7 @@ from selenium.common.exceptions import TimeoutException
 import time
 from datetime import datetime
 import undetected_chromedriver as uc
+from tabulate import tabulate
 
 
 
@@ -63,7 +67,7 @@ def search_show(driver, show_name):
         search_input.clear()
         search_input.send_keys(show_name)
         print(f"✏️ Entered show name: {show_name}")
-        
+
         # Wait until the hidden input actually has the value
         wait.until(lambda d: d.find_element(By.NAME, "search_key").get_attribute("value").strip() != "-")
 
@@ -120,8 +124,7 @@ def scrape_show_details(driver, product_url):
         return []
 
     driver.get(product_url)
-    wait = WebDriverWait(driver, 30)
-
+    wait = WebDriverWait(driver, 15)
 
     try:
         # Check if the specific text exists in the page
@@ -268,20 +271,102 @@ def scrape_show_details(driver, product_url):
         print("❌ Failed to scrape product details:", e)
         return []
 
+def update_sheet_with_cal_store_event(scraped_event):
+
+    # ✅ Connect to Google Sheets using service account from env
+    service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
+    client = gspread.authorize(creds)
+
+    sheet = client.open("דאטה אפשיט אופיס").worksheet("כרטיסים")
+
+    data = sheet.get_all_records()
+    headers = sheet.row_values(1)
+    sold_col = headers.index("נמכרו") + 1
+    updated_col = headers.index("עודכן לאחרונה") + 1
+
+    # Normalize date
+    scraped_date = datetime.strptime(scraped_event["date"], "%d/%m/%Y").date()
+
+    israel_tz = pytz.timezone("Asia/Jerusalem")
+    now_israel = datetime.now(israel_tz).strftime('%d/%m/%Y %H:%M:%S')
+
+    updated = False
+
+    for i, row in enumerate(data, start=2):  # start=2 because row 1 is headers
+        try:
+            row_date = row["תאריך"]
+            if isinstance(row_date, str):
+                try:
+                    row_date = datetime.strptime(row_date, "%d/%m/%Y").date()
+                except:
+                    continue
+            elif isinstance(row_date, datetime):
+                row_date = row_date.date()
+
+            # Match by title, hall, date, and organization "ויזה כאל"
+            if (
+                scraped_event["title"].strip() in row["הפקה"].strip() and
+                # row["אולם"].strip() == scraped_event["hall"].strip() and
+                row_date == scraped_date and
+                row["ארגון"].strip() == "ויזה כאל"
+            ):
+                # Update sold and timestamp
+                sold = int(row.get("קיבלו", 0)) - int(scraped_event.get("available", 0))
+                sheet.update_cell(i, sold_col, sold)
+                sheet.update_cell(i, updated_col, now_israel)
+                updated = True
+                print(f"✅ Updated row {i}: {scraped_event['title']} - Sold = {sold}")
+                break
+
+        except Exception as e:
+            print(f"⚠️ Error parsing row {i}: {e}")
+
+    if not updated:
+        print(f"❌ No matching row found for {scraped_event['title']} on {scraped_event['date']}")
+
+    return updated  # ✅ Return True if updated, False otherwise
+
 def main():
-    driver = init_driver()
-    short_names = get_short_names()
+    driver = init_driver()  # initialize Selenium driver
+    short_names = get_short_names()  # get list of shows to search
     all_results = []
 
+    # Lists to track which events were updated and which were not
+    updated_data = []
+    not_updated = []
+
     for show_name in short_names:
-        urls = search_show(driver, show_name)  # now returns list
+        urls = search_show(driver, show_name)  # returns list of product URLs
         for url in urls:
-            results = scrape_show_details(driver, url)
+            results = scrape_show_details(driver, url)  # scrape event details
             all_results.extend(results)
-            time.sleep(2)
+
+            # Update sheet for each scraped event
+            for event in results:
+                updated = update_sheet_with_cal_store_event(event)
+                if updated:
+                    updated_data.append(event)
+                else:
+                    not_updated.append(event)
+
+            time.sleep(2)  # be polite with server
 
     driver.quit()
-    return all_results
+
+    # Print tables
+    if updated_data:
+        print("\n✅ Updated events:")
+        print(tabulate(updated_data, headers="keys", tablefmt="grid", stralign="center"))
+    else:
+        print("\n⚠️ No events were updated.")
+
+    if not_updated:
+        print(f"\n⚠️ {len(not_updated)} events were NOT matched in the sheet:")
+        print(tabulate(not_updated, headers="keys", tablefmt="grid", stralign="center"))
+
+    return all_results, updated_data, not_updated
 
 if __name__ == "__main__":
     main()
