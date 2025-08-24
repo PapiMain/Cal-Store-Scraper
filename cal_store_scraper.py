@@ -64,13 +64,20 @@ def search_show(driver, show_name):
         search_input.send_keys(show_name + Keys.RETURN)
         print(f"✏️ Entered show name: {show_name}")
 
+         # Wait for the search results to load
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#search-form button")))
+
         # Find the button and print debug info
         search_button = driver.find_element(By.CSS_SELECTOR, "#search-form button")
         print(f"🔘 Clicking button: {search_button.get_attribute('outerHTML')}")
         search_button.click()
 
         # Wait a bit for URL to change
+        wait.until(lambda d: "search_key=" in d.current_url)
         print(f"🌐 Current URL after click: {driver.current_url}")
+        if "search_key=-" in driver.current_url:
+            print("⚠️ URL indicates no results (search_key=-)")
+            return []
 
         # Get all product links
         wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.link-block")))
@@ -114,20 +121,31 @@ def scrape_show_details(driver, product_url):
     driver.get(product_url)
     wait = WebDriverWait(driver, 30)
 
+
     try:
+        # Check if the specific text exists in the page
+        if "מחיר מיוחד ללא שימוש בחוויה" in driver.page_source:
+            print("⚠️ Skipping page due to 'מחיר מיוחד ללא שימוש בחוויה'")
+            return []
+        
         # 🟢 Step 2: Title
+        title = ""
         try:
-            title_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h2.font-weight-600")))
+            # Primary: h2 inside the header column (not the table)
+            title_el = wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "div.col-9.col-lg-4 h2.font-weight-600")
+            ))
             title = (driver.execute_script("return arguments[0].textContent;", title_el) or "").strip()
-            if not title:
-                raise Exception("Empty h2 text, fallback")
-        except Exception:
+        except:
             try:
+                # Fallback: strong inside header span
                 title_el = driver.find_element(By.CSS_SELECTOR, "span.d-none.d-lg-inline strong")
                 title = (driver.execute_script("return arguments[0].textContent;", title_el) or "").strip()
-            except Exception:
+            except:
                 title = ""
+
         print(f"🟢 Step 2: Product page loaded for '{title}'")
+
 
         # 🟢 Step 3: Hidden inputs → JSON (all halls & dates)
         halls_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input.show_hidden_all_halls")))
@@ -172,7 +190,7 @@ def scrape_show_details(driver, product_url):
         # 🟢 Step 4: Parse table rows (hidden + visible)
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")))
         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-stock tbody tr.tr-product")
-        print(f"🟢 Step 4: Found {len(rows)} table rows")
+        # print(f"🟢 Step 4: Found {len(rows)} table rows")
 
         results = []
 
