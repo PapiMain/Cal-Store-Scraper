@@ -28,11 +28,13 @@ def get_short_names():
     return [row["שם מקוצר"] for row in data if row["שם מקוצר"]]
 
 def init_driver():
+     uc.install()
     options = uc.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--headless=new")
     options.add_argument("--window-size=1920,1080")
-    # remove --headless
+
     driver = uc.Chrome(options=options)
     return driver
     
