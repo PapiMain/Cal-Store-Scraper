@@ -32,7 +32,10 @@ def init_driver():
     options = uc.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--headless=new")
+    
+    # temp no headless
+    # options.add_argument("--headless=new")
+    
     options.add_argument("--window-size=1920,1080")
 
     driver = uc.Chrome(options=options)
@@ -40,6 +43,11 @@ def init_driver():
     
 def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
+    
+    # temp debugging
+    time.sleep(5)
+    print(driver.page_source[:1000])  # first 1000 chars
+
     wait = WebDriverWait(driver, 15)
     wait.until(EC.presence_of_element_located((By.NAME, "search_key")))
     print("🟢 Step 1: Page loaded")
