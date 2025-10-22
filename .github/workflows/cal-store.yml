@@ -3,6 +3,7 @@ name: Cal Store Scraper
 on:
   schedule:
     - cron: "0 4 * * *" # 7 AM Israel time (UTC+3)
+    - cron: "0 11 * * *" # 2 PM Israel time
   workflow_dispatch:
 
 jobs:
