@@ -296,7 +296,7 @@ def update_sheet_with_cal_store_event(scraped_event):
     scraped_date = datetime.strptime(scraped_event["date"], "%d/%m/%Y").date()
 
     israel_tz = pytz.timezone("Asia/Jerusalem")
-    now_israel = datetime.now(israel_tz).strftime('%d/%m/%Y %H:%M:%S')
+    now_israel = datetime.now(israel_tz).strftime('%d/%m/%Y %H:%M')
 
     updated = False
 
