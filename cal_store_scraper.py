@@ -12,7 +12,6 @@ import time
 from datetime import datetime
 import undetected_chromedriver as uc
 from tabulate import tabulate
-from undetected_chromedriver import Chrome, ChromeOptions, __version__ as uc_version
 
 
 
@@ -29,15 +28,14 @@ def get_short_names():
     return [row["שם מקוצר"] for row in data if row["שם מקוצר"]]
 
 def init_driver():
-    print(f"🚀 Using undetected_chromedriver version: {uc_version}")
     
-    options = ChromeOptions()
+    options = uc.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--headless=new")
     options.add_argument("--window-size=1920,1080")
 
-    driver = Chrome(options=options, driver_executable_path=None)
+    driver = uc.Chrome(options=options)
     return driver
     
 def search_show(driver, show_name):
