@@ -28,7 +28,7 @@ def get_short_names():
     return [row["שם מקוצר"] for row in data if row["שם מקוצר"]]
 
 def init_driver():
-     uc.install()
+    uc.install()
     options = uc.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
