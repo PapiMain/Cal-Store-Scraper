@@ -403,7 +403,7 @@ def main():
     
     # --- Batch update the Google Sheet ---
     # update_sheet_with_cal_store_events will return matched and unmatched events
-    matched, unmatched = update_sheet_with_cal_store_events(all_results)
+    matched, unmatched = update_sheet_with_cal_store_event(all_results)
 
     # Separate matched vs unmatched for printing
     updated_data.extend(matched)
