@@ -277,7 +277,7 @@ def scrape_show_details(driver, product_url):
         print("❌ Failed to scrape product details:", e)
         return []
 
-def update_sheet_with_cal_store_event(scraped_event):
+def update_sheet_with_cal_store_event(scraped_events):
     """
     Batch update Google Sheet with sold seats for multiple Cal Store events.
     scraped_events: list of dicts with keys: title, date, available
