@@ -278,7 +278,11 @@ def scrape_show_details(driver, product_url):
         return []
 
 def update_sheet_with_cal_store_event(scraped_event):
-
+     """
+    Batch update Google Sheet with sold seats for multiple Cal Store events.
+    scraped_events: list of dicts with keys: title, date, available
+    """
+    
     # ✅ Connect to Google Sheets using service account from env
     service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -286,57 +290,89 @@ def update_sheet_with_cal_store_event(scraped_event):
     client = gspread.authorize(creds)
 
     sheet = client.open("דאטה אפשיט אופיס").worksheet("כרטיסים")
-
     data = sheet.get_all_records()
     headers = sheet.row_values(1)
-    sold_col = headers.index("נמכרו") + 1
-    updated_col = headers.index("עודכן לאחרונה") + 1
 
-    # Normalize date
-    scraped_date = datetime.strptime(scraped_event["date"], "%d/%m/%Y").date()
+    # --- Column indices ---
+    col_idx = {
+        "sold": headers.index("נמכרו") + 1,
+        "updated": headers.index("עודכן לאחרונה") + 1,
+        "title": headers.index("הפקה"),
+        "date": headers.index("תאריך"),
+        "org": headers.index("ארגון"),
+        "received": headers.index("קיבלו")
+    }
 
     israel_tz = pytz.timezone("Asia/Jerusalem")
     now_israel = datetime.now(israel_tz).strftime('%d/%m/%Y %H:%M')
 
-    updated = False
+    updates = []  # will collect all updates for batch call
+    matched_events = []
+    unmatched_events = []
 
-    for i, row in enumerate(data, start=2):  # start=2 because row 1 is headers
+    # --- Loop through events ---
+    for event in scraped_events:
         try:
-            row_date = row["תאריך"]
-            if isinstance(row_date, str):
-                try:
-                    row_date = datetime.strptime(row_date, "%d/%m/%Y").date()
-                except:
-                    continue
-            elif isinstance(row_date, datetime):
-                row_date = row_date.date()
+            scraped_date = datetime.strptime(event["date"], "%d/%m/%Y").date()
+            matched = False
 
-            # Flexible title matching: either contains the other
-            title_match = (scraped_event["title"].strip() in row["הפקה"].strip()
-            or row["הפקה"].strip() in scraped_event["title"].strip())
+            for i, row in enumerate(data, start=2):
+                # Parse date from sheet
+                row_date = row["תאריך"]
+                if isinstance(row_date, str):
+                    try:
+                        row_date = datetime.strptime(row_date, "%d/%m/%Y").date()
+                    except:
+                        continue
+                elif isinstance(row_date, datetime):
+                    row_date = row_date.date()
 
-            # Match by title, hall, date, and organization "ויזה כאל"
-            if (
-                title_match and
-                # row["אולם"].strip() == scraped_event["hall"].strip() and # Hall matching disabled for flexibility
-                row_date == scraped_date and
-                row["ארגון"].strip() == "ויזה כאל"
-            ):
-                # Update sold and timestamp
-                sold = int(row.get("קיבלו", 0)) - int(scraped_event.get("available", 0))
-                sheet.update_cell(i, sold_col, sold)
-                sheet.update_cell(i, updated_col, now_israel)
-                updated = True
-                print(f"✅ Updated row {i}: {scraped_event['title']} - Sold = {sold}")
-                break
+                # Title matching
+                title_match = (
+                    event["title"].strip() in row["הפקה"].strip() or
+                    row["הפקה"].strip() in event["title"].strip()
+                )
+
+                # Match by title, date, org
+                if title_match and row_date == scraped_date and row["ארגון"].strip() == "ויזה כאל":
+                    try:
+                        sold = int(row.get("קיבלו", 0)) - int(event.get("available", 0))
+                    except:
+                        sold = ""
+
+                    # Queue for batch update
+                    updates.append({
+                        "range": f"{sheet.title}!{gspread.utils.rowcol_to_a1(i, col_idx['sold'])}",
+                        "values": [[sold]]
+                    })
+                    updates.append({
+                        "range": f"{sheet.title}!{gspread.utils.rowcol_to_a1(i, col_idx['updated'])}",
+                        "values": [[now_israel]]
+                    })
+
+                    print(f"✅ Queued row {i}: {event['title']} - Sold = {sold}")
+                    matched_events.append(event)
+                    matched = True
+                    break
+
+            if not matched:
+                print(f"❌ No matching row found for {event['title']} on {event['date']}")
+                unmatched_events.append(event)
 
         except Exception as e:
-            print(f"⚠️ Error parsing row {i}: {e}")
+            print(f"⚠️ Error processing event {event.get('title')}: {e}")
+            unmatched_events.append(event)
 
-    if not updated:
-        print(f"❌ No matching row found for {scraped_event['title']} on {scraped_event['date']}")
-
-    return updated  # ✅ Return True if updated, False otherwise
+    # --- Perform one batch update ---
+    if updates:
+        sheet.batch_update(updates)
+        print(f"🚀 Batch update completed ({len(updates)//2} rows updated)")
+    else:
+        print("ℹ️ No updates were queued.")
+        
+    return matched_events, unmatched_events    
+    # if not updated:
+    #     print(f"❌ No matching row found for {scraped_event['title']} on {scraped_event['date']}")
 
 def main():
     driver = init_driver()  # initialize Selenium driver
@@ -353,18 +389,27 @@ def main():
             results = scrape_show_details(driver, url)  # scrape event details
             all_results.extend(results)
 
+            pass
             # Update sheet for each scraped event
-            for event in results:
-                updated = update_sheet_with_cal_store_event(event)
-                if updated:
-                    updated_data.append(event)
-                else:
-                    not_updated.append(event)
+            # for event in results:
+            #     updated = update_sheet_with_cal_store_event(event)
+            #     if updated:
+            #         updated_data.append(event)
+            #     else:
+            #         not_updated.append(event)
 
             time.sleep(2)  # be polite with server
 
     driver.quit()
+    
+    # --- Batch update the Google Sheet ---
+    # update_sheet_with_cal_store_events will return matched and unmatched events
+    matched, unmatched = update_sheet_with_cal_store_events(all_results)
 
+    # Separate matched vs unmatched for printing
+    updated_data.extend(matched)
+    not_updated.extend(unmatched)
+    
     # Print tables
     if updated_data:
         print("\n✅ Updated events:")
