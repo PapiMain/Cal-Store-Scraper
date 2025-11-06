@@ -278,11 +278,10 @@ def scrape_show_details(driver, product_url):
         return []
 
 def update_sheet_with_cal_store_event(scraped_event):
-     """
+    """
     Batch update Google Sheet with sold seats for multiple Cal Store events.
     scraped_events: list of dicts with keys: title, date, available
     """
-    
     # ✅ Connect to Google Sheets using service account from env
     service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
