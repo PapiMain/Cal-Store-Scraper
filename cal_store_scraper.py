@@ -341,11 +341,11 @@ def update_sheet_with_cal_store_event(scraped_events):
 
                     # Queue for batch update
                     updates.append({
-                        "range": f"{sheet.title}!{gspread.utils.rowcol_to_a1(i, col_idx['sold'])}",
+                        "range": gspread.utils.rowcol_to_a1(i, col_idx['sold']),
                         "values": [[sold]]
                     })
                     updates.append({
-                        "range": f"{sheet.title}!{gspread.utils.rowcol_to_a1(i, col_idx['updated'])}",
+                        "range": gspread.utils.rowcol_to_a1(i, col_idx['updated']),
                         "values": [[now_israel]]
                     })
 
