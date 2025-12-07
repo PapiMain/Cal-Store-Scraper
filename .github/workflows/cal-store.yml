@@ -32,9 +32,9 @@ jobs:
           sudo apt-get install -y google-chrome-stable
           
           # Get Chrome major version (e.g., 142 from 142.0.7444.0)
-          CHROME_VER=$(google-chrome --version | grep -oP '\d+')
+          CHROME_VER=$(google-chrome --version | awk '{print $3}' | cut -d. -f1)
           echo "CHROME_VER=$CHROME_VER" >> $GITHUB_ENV
-          echo "Installed Chrome version: $CHROME_VER"
+          echo "Installed Chrome major version: $CHROME_VER"
 
       - name: Install dependencies
         run: |
