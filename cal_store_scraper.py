@@ -333,11 +333,17 @@ def update_sheet_with_cal_store_event(scraped_events):
                         continue
                 elif isinstance(row_date, datetime):
                     row_date = row_date.date()
-
+                    
+                event_name = event["title"].strip()
+                row_name = row["הפקה"].strip()
+                
+                if "עכבר העיר" in event_name:
+                event_name = "עכבר העיר"
+                
                 # Title matching
                 title_match = (
-                    event["title"].strip() in row["הפקה"].strip() or
-                    row["הפקה"].strip() in event["title"].strip()
+                    event_name in row_name or
+                    row_name in event_name
                 )
 
                 # Match by title, date, org
