@@ -35,8 +35,11 @@ def init_driver():
     options.add_argument("--disable-dev-shm-usage")
     # temp no headless
     # options.add_argument("--headless=new")
-    
     options.add_argument("--window-size=1920,1080")
+
+    # NEW: point explicitly to the upgraded Chrome
+    options.binary_location = "/usr/bin/google-chrome-stable"
+    
     if chrome_version:
         print(f"🔧 Launching ChromeDriver for Chrome v{chrome_version}")
         driver = uc.Chrome(version_main=int(chrome_version), options=options)
