@@ -338,7 +338,7 @@ def update_sheet_with_cal_store_event(scraped_events):
                 row_name = row["הפקה"].strip()
                 
                 if "עכבר העיר" in event_name:
-                event_name = "עכבר העיר"
+                    event_name = "עכבר העיר"
                 
                 # Title matching
                 title_match = (
