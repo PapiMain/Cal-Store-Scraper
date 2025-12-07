@@ -29,16 +29,21 @@ def get_short_names():
 
 def init_driver():
     
+    chrome_version = os.environ.get("CHROME_VER")
     options = uc.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    
     # temp no headless
     # options.add_argument("--headless=new")
     
     options.add_argument("--window-size=1920,1080")
+    if chrome_version:
+        print(f"🔧 Launching ChromeDriver for Chrome v{chrome_version}")
+        driver = uc.Chrome(version_main=int(chrome_version), options=options)
+    else:
+        print("⚠️ CHROME_VER not found, using default ChromeDriver")
+        driver = uc.Chrome(options=options)
 
-    driver = uc.Chrome(options=options)
     return driver
     
 def search_show(driver, show_name):
