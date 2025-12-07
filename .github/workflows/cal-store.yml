@@ -30,7 +30,11 @@ jobs:
           sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
-          google-chrome --version
+          
+          # Get Chrome major version (e.g., 142 from 142.0.7444.0)
+          CHROME_VER=$(google-chrome --version | grep -oP '\d+')
+          echo "CHROME_VER=$CHROME_VER" >> $GITHUB_ENV
+          echo "Installed Chrome version: $CHROME_VER"
 
       - name: Install dependencies
         run: |
