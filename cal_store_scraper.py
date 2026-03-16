@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 import json, re, html
 import pytz
+import requests
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -29,6 +30,38 @@ def get_short_names():
         print(f"❌ Error fetching short names: {e}")
         return []
 
+def send_appsheet_batch(table_name, updates):
+    """Sends a batch 'Edit' action directly to the AppSheet API."""
+    app_id = os.environ.get("APPSHEET_APP_ID")
+    api_key = os.environ.get("APPSHEET_APP_KEY")
+    
+    url = f"https://api.appsheet.com/api/v1/apps/{app_id}/tables/{table_name}/Action"
+    
+    headers = {
+        "ApplicationToken": api_key,
+        "Content-Type": "application/json"
+    }
+    
+    body = {
+        "Action": "Edit",
+        "Properties": {
+            "Locale": "en-US",
+            "Timezone": "Israel Standard Time"
+        },
+        "Rows": updates
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=body)
+        response.raise_for_status()
+        print(f"✅ AppSheet API Response: {response.status_code} - Success")
+        return True
+    except Exception as e:
+        print(f"❌ API Post Error: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Context: {e.response.text}")
+        return False
+    
 def init_driver():
     
     chrome_version = os.environ.get("CHROME_VER")
@@ -55,8 +88,8 @@ def search_show(driver, show_name):
     driver.get("https://www.cal-store.co.il")
     
     # temp debugging
-    time.sleep(5)
-    print(driver.page_source[:1000])  # first 1000 chars
+    # time.sleep(5)
+    # print(driver.page_source[:1000])  # first 1000 chars
 
     wait = WebDriverWait(driver, 15)
     wait.until(EC.presence_of_element_located((By.NAME, "search_key")))
@@ -78,7 +111,7 @@ def search_show(driver, show_name):
         if not search_input:
             raise Exception("No visible search input found")
         
-        print(f"✅ Using input: id={search_input.get_attribute('id')} | placeholder={search_input.get_attribute('placeholder')}")
+        # print(f"✅ Using input: id={search_input.get_attribute('id')} | placeholder={search_input.get_attribute('placeholder')}")
 
         search_input.clear()
         search_input.send_keys(show_name)
@@ -92,7 +125,7 @@ def search_show(driver, show_name):
 
         # Find the button and print debug info
         search_button = driver.find_element(By.CSS_SELECTOR, "#search-form button")
-        print(f"🔘 Clicking button: {search_button.get_attribute('outerHTML')}")
+        # print(f"🔘 Clicking button: {search_button.get_attribute('outerHTML')}")
         search_button.click()
 
         # Wait a bit for URL to change
@@ -190,7 +223,7 @@ def scrape_show_details(driver, product_url):
             print(f"⚠️ dates JSON parse failed ({e}). First 200 chars: {dates_str[:200]}")
             dates_list = []
 
-        print(f"🟢 Hidden JSON: halls={len(halls_list)} entries, dates={len(dates_list)} entries")
+        # print(f"🟢 Hidden JSON: halls={len(halls_list)} entries, dates={len(dates_list)} entries")
 
         # Build lookups
         hall_by_id = {}
@@ -288,13 +321,13 @@ def scrape_show_details(driver, product_url):
         return []
 
 def update_appsheet_events(scraped_events):
-    """Updates AppSheet table 'כרטיסים' using batch Edit action."""
+    """Updates AppSheet table 'הופעות עתידיות' using batch Edit action."""
     client = get_appsheet_client()
     
     # 1. Get existing data from AppSheet to find matching rows
     try:
         print("⏳ Fetching current AppSheet records for matching...")
-        app_rows = client.find_items("כרטיסים", "")
+        app_rows = client.find_items("הופעות עתידיות", "")
     except Exception as e:
         print(f"❌ AppSheet fetch error: {e}")
         return [], scraped_events
@@ -308,20 +341,29 @@ def update_appsheet_events(scraped_events):
 
     for event in scraped_events:
         try:
-            # scraped_date = datetime.strptime(event["date"], "%d/%m/%Y").date()
-            scraped_date_str = event["date"]
+            scraped_date_str = datetime.strptime(event["date"], "%d/%m/%Y").date()
             matched = False
 
             for row in app_rows:
                 # AppSheet usually returns dates as strings or ISO. 
                 # Adjust format if your AppSheet date format is different.
-                # row_date = datetime.strptime(row_date, "%d/%m/%Y").date()
-                row_date = row.get("תאריך", "")
+                row_date_str = str(row.get("תאריך", ""))
+                if not row_date_str:
+                    continue
+
+                try:
+                    row_date_obj = datetime.strptime(row_date_str, "%m/%d/%Y").date()
+                except ValueError:
+                    # Fallback in case AppSheet format changes
+                    try:
+                        row_date_obj = datetime.strptime(row_date_str, "%d/%m/%Y").date()
+                    except:
+                        continue
                 event_name = event["title"].strip()
                 row_name = row.get("הפקה", "").strip()
 
                 # for debugging:
-                print(f"Matching Event '{event_name}' on {scraped_date_str} against Row '{row_name}' on {row_date}'")
+                # print(f"Matching Event '{event_name}' on {scraped_date_str} against Row '{row_name}' on {row_date}'")
 
                 if "סימבה" in event_name and "סוואנה" not in event_name and "אפריקה" not in event_name:
                     event_name = "סימבה מלך"
@@ -339,12 +381,17 @@ def update_appsheet_events(scraped_events):
 
                 
                 # Matching Logic
-                if title_match and row_date == scraped_date_str and row.get("ארגון") == "ויזה כאל":
+                if title_match and row_date_obj == scraped_date_str and row.get("ארגון") == "ויזה כאל":
                     try:
                         # Calculation: Received - Available
                         received = int(row.get("קיבלו", 0))
                         available = int(event.get("available", 0))
                         sold = received - available
+
+                        # Fix for negative numbers
+                        if sold < 0:
+                            print(f"⚠️ Warning: Negative sold tickets for {row_name}. Setting to 0.")
+                            sold = 0
                     except:
                         sold = 0
 
@@ -368,15 +415,10 @@ def update_appsheet_events(scraped_events):
 
     # 2. Perform the API Update
     if batch_updates:
-        print(f"📤 Sending {len(batch_updates)} updates to AppSheet...")
-        try:
-            # Note: py-appsheet might not have a built-in 'edit' helper for batches 
-            # depending on version, so we use the client's internal caller if needed.
-            # But the standard is:
-            client.update_items("כרטיסים", batch_updates)
-            print(f"🚀 AppSheet update successful!")
-        except Exception as e:
-            print(f"❌ AppSheet Update Failed: {e}")
+        print(f"📤 Sending {len(batch_updates)} rows to AppSheet API...")
+        send_appsheet_batch("הופעות עתידיות", batch_updates)
+    else:
+        print("ℹ️ No updates to send.")
     
     return matched_events, unmatched_events
 
