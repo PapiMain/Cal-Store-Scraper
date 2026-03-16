@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+      APPSHEET_APP_ID: ${{ secrets.APPSHEET_APP_ID }}
+      APPSHEET_APP_KEY: ${{ secrets.APPSHEET_APP_KEY }}
 
     steps:
       - name: Checkout repository
@@ -21,7 +22,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          
+
       - name: Install latest Google Chrome
         run: |
           sudo apt-get update
@@ -30,7 +31,7 @@ jobs:
           sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
-          
+
           # Get Chrome major version (e.g., 142 from 142.0.7444.0)
           CHROME_VER=$(google-chrome --version | awk '{print $3}' | cut -d. -f1)
           echo "CHROME_VER=$CHROME_VER" >> $GITHUB_ENV

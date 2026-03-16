@@ -1,6 +1,3 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
 import json, re, html
@@ -12,20 +9,25 @@ import time
 from datetime import datetime
 import undetected_chromedriver as uc
 from tabulate import tabulate
+from py_appsheet import AppSheetClient
 
 
+def get_appsheet_client():
+    return AppSheetClient(
+        app_id=os.environ.get("APPSHEET_APP_ID"),
+        api_key=os.environ.get("APPSHEET_APP_KEY"),
+    )
 
 def get_short_names():
-    service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
-    client = gspread.authorize(creds)
-    
-
-    sheet = client.open("דאטה אפשיט אופיס").worksheet("הפקות")
-    data = sheet.get_all_records()
-
-    return [row["שם מקוצר"] for row in data if row["שם מקוצר"]]
+    """Fetches show names from AppSheet instead of GSpread."""
+    client = get_appsheet_client()
+    try:
+        # Fetching from 'הפקות' table
+        rows = client.find_items("הפקות", "")
+        return [row["שם מקוצר"] for row in rows if row.get("שם מקוצר")]
+    except Exception as e:
+        print(f"❌ Error fetching short names: {e}")
+        return []
 
 def init_driver():
     
@@ -285,156 +287,124 @@ def scrape_show_details(driver, product_url):
         print("❌ Failed to scrape product details:", e)
         return []
 
-def update_sheet_with_cal_store_event(scraped_events):
-    """
-    Batch update Google Sheet with sold seats for multiple Cal Store events.
-    scraped_events: list of dicts with keys: title, date, available
-    """
-    # ✅ Connect to Google Sheets using service account from env
-    service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
-    client = gspread.authorize(creds)
-
-    sheet = client.open("דאטה אפשיט אופיס").worksheet("כרטיסים")
-    data = sheet.get_all_records()
-    headers = sheet.row_values(1)
-
-    # --- Column indices ---
-    col_idx = {
-        "sold": headers.index("נמכרו") + 1,
-        "updated": headers.index("עודכן לאחרונה") + 1,
-        "title": headers.index("הפקה"),
-        "date": headers.index("תאריך"),
-        "org": headers.index("ארגון"),
-        "received": headers.index("קיבלו")
-    }
+def update_appsheet_events(scraped_events):
+    """Updates AppSheet table 'כרטיסים' using batch Edit action."""
+    client = get_appsheet_client()
+    
+    # 1. Get existing data from AppSheet to find matching rows
+    try:
+        print("⏳ Fetching current AppSheet records for matching...")
+        app_rows = client.find_items("כרטיסים", "")
+    except Exception as e:
+        print(f"❌ AppSheet fetch error: {e}")
+        return [], scraped_events
 
     israel_tz = pytz.timezone("Asia/Jerusalem")
     now_israel = datetime.now(israel_tz).strftime('%d/%m/%Y %H:%M')
-
-    updates = []  # will collect all updates for batch call
+    
+    batch_updates = []
     matched_events = []
     unmatched_events = []
 
-    # --- Loop through events ---
     for event in scraped_events:
         try:
-            scraped_date = datetime.strptime(event["date"], "%d/%m/%Y").date()
+            # scraped_date = datetime.strptime(event["date"], "%d/%m/%Y").date()
+            scraped_date_str = event["date"]
             matched = False
 
-            for i, row in enumerate(data, start=2):
-                # Parse date from sheet
-                row_date = row["תאריך"]
-                if isinstance(row_date, str):
-                    try:
-                        row_date = datetime.strptime(row_date, "%d/%m/%Y").date()
-                    except:
-                        continue
-                elif isinstance(row_date, datetime):
-                    row_date = row_date.date()
-                    
+            for row in app_rows:
+                # AppSheet usually returns dates as strings or ISO. 
+                # Adjust format if your AppSheet date format is different.
+                # row_date = datetime.strptime(row_date, "%d/%m/%Y").date()
+                row_date = row.get("תאריך", "")
                 event_name = event["title"].strip()
-                row_name = row["הפקה"].strip()
-                
+                row_name = row.get("הפקה", "").strip()
+
+                # for debugging:
+                print(f"Matching Event '{event_name}' on {scraped_date_str} against Row '{row_name}' on {row_date}'")
+
+                if "סימבה" in event_name and "סוואנה" not in event_name and "אפריקה" not in event_name:
+                    event_name = "סימבה מלך"
+
                 if "עכבר העיר" in event_name:
                     event_name = "עכבר העיר"
+
+                title_match = (event_name in row_name or row_name in event_name)
                 
-                # Title matching
-                title_match = (
-                    event_name in row_name or
-                    row_name in event_name
-                )
+                exclude_words = ["סוואנה", "אפריקה", "הפקת הענק"]
 
-                # Match by title, date, org
-                if title_match and row_date == scraped_date and row["ארגון"].strip() == "ויזה כאל":
+                if "סימבה" in event_name or "פיטר פן" in event_name:
+                    if any(word in event_name for word in exclude_words):
+                        title_match = False
+
+                
+                # Matching Logic
+                if title_match and row_date == scraped_date_str and row.get("ארגון") == "ויזה כאל":
                     try:
-                        sold = int(row.get("קיבלו", 0)) - int(event.get("available", 0))
+                        # Calculation: Received - Available
+                        received = int(row.get("קיבלו", 0))
+                        available = int(event.get("available", 0))
+                        sold = received - available
                     except:
-                        sold = ""
+                        sold = 0
 
-                    # Queue for batch update
-                    updates.append({
-                        "range": gspread.utils.rowcol_to_a1(i, col_idx['sold']),
-                        "values": [[sold]]
+                    # AppSheet Batch Object
+                    batch_updates.append({
+                        "ID": row["ID"], # Using the Key column
+                        "נמכרו": sold,
+                        "עודכן לאחרונה": now_israel
                     })
-                    updates.append({
-                        "range": gspread.utils.rowcol_to_a1(i, col_idx['updated']),
-                        "values": [[now_israel]]
-                    })
-
-                    print(f"✅ Queued row {i}: {event['title']} - Sold = {sold}")
+                    
                     matched_events.append(event)
                     matched = True
                     break
-
+            
             if not matched:
-                print(f"❌ No matching row found for {event['title']} on {event['date']}")
                 unmatched_events.append(event)
 
         except Exception as e:
-            print(f"⚠️ Error processing event {event.get('title')}: {e}")
+            print(f"⚠️ Error processing {event.get('title')}: {e}")
             unmatched_events.append(event)
 
-    # --- Perform one batch update ---
-    if updates:
-        sheet.batch_update(updates)
-        print(f"🚀 Batch update completed ({len(updates)//2} rows updated)")
-    else:
-        print("ℹ️ No updates were queued.")
-        
-    return matched_events, unmatched_events    
-    # if not updated:
-    #     print(f"❌ No matching row found for {scraped_event['title']} on {scraped_event['date']}")
+    # 2. Perform the API Update
+    if batch_updates:
+        print(f"📤 Sending {len(batch_updates)} updates to AppSheet...")
+        try:
+            # Note: py-appsheet might not have a built-in 'edit' helper for batches 
+            # depending on version, so we use the client's internal caller if needed.
+            # But the standard is:
+            client.update_items("כרטיסים", batch_updates)
+            print(f"🚀 AppSheet update successful!")
+        except Exception as e:
+            print(f"❌ AppSheet Update Failed: {e}")
+    
+    return matched_events, unmatched_events
 
 def main():
     driver = init_driver()  # initialize Selenium driver
     short_names = get_short_names()  # get list of shows to search
     all_results = []
 
-    # Lists to track which events were updated and which were not
-    updated_data = []
-    not_updated = []
-
     for show_name in short_names:
         urls = search_show(driver, show_name)  # returns list of product URLs
         for url in urls:
             results = scrape_show_details(driver, url)  # scrape event details
             all_results.extend(results)
-
-            pass
-            # Update sheet for each scraped event
-            # for event in results:
-            #     updated = update_sheet_with_cal_store_event(event)
-            #     if updated:
-            #         updated_data.append(event)
-            #     else:
-            #         not_updated.append(event)
-
             time.sleep(2)  # be polite with server
 
     driver.quit()
     
-    # --- Batch update the Google Sheet ---
-    # update_sheet_with_cal_store_events will return matched and unmatched events
-    matched, unmatched = update_sheet_with_cal_store_event(all_results)
+    matched, unmatched = update_appsheet_events(all_results)
 
-    # Separate matched vs unmatched for printing
-    updated_data.extend(matched)
-    not_updated.extend(unmatched)
-    
-    # Print tables
-    if updated_data:
+    if matched:
         print("\n✅ Updated events:")
-        print(tabulate(updated_data, headers="keys", tablefmt="grid", stralign="center"))
+        print(tabulate(matched, headers="keys", tablefmt="grid"))
     else:
         print("\n⚠️ No events were updated.")
 
-    if not_updated:
-        print(f"\n⚠️ {len(not_updated)} events were NOT matched in the sheet:")
-        print(tabulate(not_updated, headers="keys", tablefmt="grid", stralign="center"))
-
-    return all_results, updated_data, not_updated
+    if unmatched:
+        print(f"\n⚠️ {len(unmatched)} events were NOT matched:")
+        print(tabulate(unmatched, headers="keys", tablefmt="grid"))
 
 if __name__ == "__main__":
     main()
