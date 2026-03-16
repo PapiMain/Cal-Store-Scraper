@@ -252,7 +252,7 @@ def scrape_show_details(driver, product_url):
             hall_uid  = row.get_attribute("data-hall-uid") or ""
             date_show = row.get_attribute("data-date-show") or ""
 
-            print(f"Row #{idx}: displayed={row.is_displayed()} | stock_uid={stock_uid} | hall_uid={hall_uid} | date_show={date_show}")
+            # print(f"Row #{idx}: displayed={row.is_displayed()} | stock_uid={stock_uid} | hall_uid={hall_uid} | date_show={date_show}")
 
             cols = row.find_elements(By.CSS_SELECTOR, "td")
             if len(cols) < 5:
@@ -311,7 +311,7 @@ def scrape_show_details(driver, product_url):
                 "available": available
             })
 
-        print(f"🟢 Step 5: Scraped {len(results)} entries")
+        print(f"🟢 number of events: Scraped {len(results)} entries")
         for r in results:
             print(r)
         return results
