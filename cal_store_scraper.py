@@ -416,7 +416,7 @@ def update_appsheet_events(scraped_events):
     # 2. Perform the API Update
     if batch_updates:
         print(f"📤 Sending {len(batch_updates)} rows to AppSheet API...")
-        send_appsheet_batch("הופעות עתידיות", batch_updates)
+        send_appsheet_batch("כרטיסים", batch_updates)
     else:
         print("ℹ️ No updates to send.")
     
