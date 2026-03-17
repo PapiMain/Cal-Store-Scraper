@@ -38,7 +38,7 @@ def send_appsheet_batch(table_name, updates):
     url = f"https://api.appsheet.com/api/v1/apps/{app_id}/tables/{table_name}/Action"
     
     headers = {
-        "ApplicationToken": api_key,
+        "ApplicationAccessKey": api_key,
         "Content-Type": "application/json"
     }
     
@@ -333,7 +333,8 @@ def update_appsheet_events(scraped_events):
         return [], scraped_events
 
     israel_tz = pytz.timezone("Asia/Jerusalem")
-    now_israel = datetime.now(israel_tz).strftime('%d/%m/%Y %H:%M')
+    # Format: 2026-03-17 14:09:00
+    now_israel = datetime.now(israel_tz).strftime('%Y-%m-%d %H:%M:00')
     
     batch_updates = []
     matched_events = []
@@ -416,7 +417,7 @@ def update_appsheet_events(scraped_events):
     # 2. Perform the API Update
     if batch_updates:
         print(f"📤 Sending {len(batch_updates)} rows to AppSheet API...")
-        send_appsheet_batch("הופעות עתידיות", batch_updates)
+        send_appsheet_batch("כרטיסים", batch_updates)
     else:
         print("ℹ️ No updates to send.")
     
